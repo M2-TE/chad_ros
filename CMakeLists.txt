@@ -11,17 +11,22 @@ set(CMAKE_C_COMPILER_LAUNCHER ccache)
 set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
-# ROS2 packages
+# package dependencies
+add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/chad_tsdf")
 find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(sensor_msgs REQUIRED)
-find_package(geometry_msgs REQUIRED)
-find_package(pcl_ros REQUIRED)
+list(APPEND ROS_PKGS rclcpp sensor_msgs geometry_msgs pcl_ros)
+foreach(PKG ${ROS_PKGS})
+    find_package(${PKG} REQUIRED)
+endforeach()
+find_package(Eigen3 REQUIRED NO_MODULE)
+
 # ros2 node executable
 add_executable(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/chad_ros.cpp")
-ament_target_dependencies(${PROJECT_NAME} rclcpp sensor_msgs geometry_msgs pcl_ros)
-install(TARGETS ${PROJECT_NAME} DESTINATION "lib/${PROJECT_NAME}")
 
-# ETC packages
-find_package(Eigen3 REQUIRED NO_MODULE)
+# link dependencies
 target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
+target_link_libraries(${PROJECT_NAME} chad::tsdf)
+ament_target_dependencies(${PROJECT_NAME} ${ROS_PKGS})
+
+# install to ros ws lib dir
+install(TARGETS ${PROJECT_NAME} DESTINATION "lib/${PROJECT_NAME}")
