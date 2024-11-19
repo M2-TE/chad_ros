@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<?xml-model
+  href="http://download.ros.org/schema/package_format3.xsd"
+  schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+
+  <name>chad_ros</name>
+  <version>1.0.0</version>
+  <description>CHAD ROS: Ros2 Humble node for CHAD TSDF</description>
+
+  <maintainer email="jan.kuhlmann@informatik.hs-fulda.de">Jan Kuhlmann</maintainer>
+  <author>Jan Kuhlmann</author>
+  <license>BSD 3-Clause</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>geometry_msgs</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+
+</package>
