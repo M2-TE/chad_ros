@@ -6,7 +6,7 @@
 
   <name>chad_ros</name>
   <version>1.0.0</version>
-  <description>CHAD ROS: Ros2 Humble node for CHAD TSDF</description>
+  <description>CHAD ROS: ROS2 humble node for CHAD TSDF</description>
 
   <maintainer email="jan.kuhlmann@informatik.hs-fulda.de">Jan Kuhlmann</maintainer>
   <author>Jan Kuhlmann</author>
@@ -16,6 +16,7 @@
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>pcl_ros</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

@@ -9,13 +9,19 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_C_COMPILER_LAUNCHER ccache)
 set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
-set(CMAKE_POLICY_DEFAULT_CMP0077 NEW) # disallow option() from overwriting set()
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 
-
+# ROS2 packages
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
+find_package(pcl_ros REQUIRED)
+# ros2 node executable
 add_executable(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/chad_ros.cpp")
-ament_target_dependencies(${PROJECT_NAME} rclcpp sensor_msgs geometry_msgs)
+ament_target_dependencies(${PROJECT_NAME} rclcpp sensor_msgs geometry_msgs pcl_ros)
 install(TARGETS ${PROJECT_NAME} DESTINATION "lib/${PROJECT_NAME}")
+
+# ETC packages
+find_package(Eigen3 REQUIRED NO_MODULE)
+target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
