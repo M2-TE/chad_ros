@@ -27,6 +27,7 @@ add_executable(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/chad_ros.cpp")
 target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
 target_link_libraries(${PROJECT_NAME} chad::tsdf)
 ament_target_dependencies(${PROJECT_NAME} ${ROS_PKGS})
+ament_package()
 
 # install to ros ws lib dir
 install(TARGETS ${PROJECT_NAME} DESTINATION "lib/${PROJECT_NAME}")
