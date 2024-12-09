@@ -1,5 +1,5 @@
 #include "chad_ros.hpp"
-#include "dag/dag.hpp"
+#include "chad/chad.hpp"
 
 struct ChadRos: public rclcpp::Node {
     ChadRos(): Node("minimal_subscriber") {
@@ -51,7 +51,7 @@ struct ChadRos: public rclcpp::Node {
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr _sub_pose;
     Eigen::Vector3f _cur_pos = { 0, 0, 0 };
     Eigen::Quaternionf _cur_rot = { 1, 0, 0, 0 };
-    DAG chad;
+    Chad chad;
 };
 
 int main(int argc, char * argv[]) {
