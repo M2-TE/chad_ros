@@ -1,13 +1,18 @@
 #include "chad_ros.hpp"
+#include "dag/dag.hpp"
 
 struct ChadRos: public rclcpp::Node {
     ChadRos(): Node("minimal_subscriber") {
         // _sub_deskewed = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-        //     "/robot/dlio/odom_node/pointcloud/deskewed", queue_size, std::bind(&ChadRos::callback_points, this, std::placeholders::_1));
+        //     "/dlio/odom_node/pointcloud/deskewed", queue_size, std::bind(&ChadRos::callback_points, this, std::placeholders::_1));
         _sub_keyframe = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/robot/dlio/odom_node/pointcloud/keyframe", queue_size, std::bind(&ChadRos::callback_points, this, std::placeholders::_1));
+            "/dlio/odom_node/pointcloud/keyframe", queue_size, std::bind(&ChadRos::callback_points, this, std::placeholders::_1));
         _sub_pose = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-            "/robot/dlio/odom_node/pose", queue_size, std::bind(&ChadRos::callback_pose, this, std::placeholders::_1));
+            "/dlio/odom_node/pose", queue_size, std::bind(&ChadRos::callback_pose, this, std::placeholders::_1));
+    }
+    ~ChadRos() {
+        chad.merge_all_subtrees();
+        chad.print_stats();
     }
 
     void callback_points(const sensor_msgs::msg::PointCloud2& msg) {
@@ -21,7 +26,8 @@ struct ChadRos: public rclcpp::Node {
         }
 
         // insert points into TSDF CHAD
-        // TODO
+        std::cout << "Inserting " << points.size() << " points into CHAD" << std::endl;
+        chad.insert(points, _cur_pos, _cur_rot);
     }
     void callback_pose(const geometry_msgs::msg::PoseStamped& msg) {
         // extract position
@@ -45,6 +51,7 @@ struct ChadRos: public rclcpp::Node {
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr _sub_pose;
     Eigen::Vector3f _cur_pos = { 0, 0, 0 };
     Eigen::Quaternionf _cur_rot = { 1, 0, 0, 0 };
+    DAG chad;
 };
 
 int main(int argc, char * argv[]) {
