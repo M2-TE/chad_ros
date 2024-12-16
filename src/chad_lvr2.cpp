@@ -3,7 +3,7 @@
 #include "chad_lvr2.hpp"
 #include "chad/chad.hpp"
 
-static void reconstruct(Chad& chad, uint32_t root_addr, std::string_view mesh_name, bool save_grid) {
+void reconstruct(Chad& chad, uint32_t root_addr, std::string_view mesh_name, bool save_grid) {
     typedef lvr2::BaseVector<float> VecT;
     typedef lvr2::BilinearFastBox<VecT> BoxT;
     
