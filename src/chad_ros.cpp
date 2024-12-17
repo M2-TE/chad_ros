@@ -14,7 +14,7 @@ struct ChadRos: public rclcpp::Node {
     ~ChadRos() {
         chad.merge_all_subtrees();
         chad.print_stats();
-        reconstruct(chad, 0, "mesh.ply", true);
+        reconstruct(chad, 1, "mesh.ply", false);
     }
 
     void callback_points(const sensor_msgs::msg::PointCloud2& msg) {
