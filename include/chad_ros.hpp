@@ -7,6 +7,7 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <pcl/features/normal_3d.h>
 #include <pcl_conversions/pcl_conversions.h>
 // ext
 #include <Eigen/Eigen>
