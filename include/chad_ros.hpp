@@ -12,6 +12,11 @@
 // ext
 #include <Eigen/Eigen>
 
+#ifdef CHAD_VDB
+#include <vdbfusion/VDBVolume.h>
+#include </root/repo/build/chad_ros/_deps/libigl-src/include/igl/write_triangle_mesh.h> // temp fix for docker
+#endif
+
 struct Point {
     Point(): data{0.f, 0.f, 0.f, 1.f} {}
 

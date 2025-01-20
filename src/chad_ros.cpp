@@ -14,7 +14,7 @@ struct ChadRos: public rclcpp::Node {
     ~ChadRos() {
         chad.merge_all_subtrees();
         chad.print_stats();
-        reconstruct(chad, 1, "mesh.ply", false);
+        reconstruct(chad, 1, "mesh.ply", true);
     }
 
     void callback_points(const sensor_msgs::msg::PointCloud2& msg) {
@@ -27,36 +27,9 @@ struct ChadRos: public rclcpp::Node {
             points.push_back({point.x, point.y, point.z});
         }
 
-        // // compact point cloud
-        // pcl::PointCloud<pcl::PointXYZ> pointcloud_pcl;
-        // pointcloud_pcl.resize(points.size());
-        // for (std::size_t i = 0; i < points.size(); i++) {
-        //     pointcloud_pcl.points[i].x = pointcloud.points[i].x;
-        //     pointcloud_pcl.points[i].y = pointcloud.points[i].y;
-        //     pointcloud_pcl.points[i].z = pointcloud.points[i].z;
-        // }
-        // // estimate normals
-        // pcl::PointCloud<pcl::Normal> normals_pcl;
-        // pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> ne;
-        // ne.setInputCloud(pointcloud_pcl.makeShared());
-        // ne.setRadiusSearch(0.03);
-        // ne.setViewPoint(_cur_pos.x(), _cur_pos.y(), _cur_pos.z());
-        // ne.compute(normals_pcl);
-        // std::vector<std::array<float, 3>> normals;
-        // normals.reserve(normals_pcl.points.size());
-        // for (const auto& normal: normals_pcl.points) {
-        //     normals.push_back({normal.normal_x, normal.normal_y, normal.normal_z});
-        // }
-
         // insert points into TSDF CHAD
         std::cout << "Inserting " << points.size() << " points into CHAD" << std::endl;
         chad.insert(points, _cur_pos, _cur_rot);
-
-
-        // chad.merge_all_subtrees();
-        // chad.print_stats();
-        // reconstruct(chad, 1, "mesh.ply", false);
-        // exit(0);
     }
     void callback_pose(const geometry_msgs::msg::PoseStamped& msg) {
         // extract position
@@ -74,7 +47,7 @@ struct ChadRos: public rclcpp::Node {
         };
     }
 
-    uint32_t queue_size = 10;
+    uint32_t queue_size = 1000;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr _sub_deskewed;
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr _sub_keyframe;
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr _sub_pose;
