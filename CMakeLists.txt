@@ -7,9 +7,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-set(CMAKE_C_COMPILER_LAUNCHER ccache)
-set(CMAKE_CXX_COMPILER_LAUNCHER ccache)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
+include(FetchContent)
 
 # ros2 node executable
 add_executable(${PROJECT_NAME} 
@@ -17,60 +16,48 @@ add_executable(${PROJECT_NAME}
     "${CMAKE_CURRENT_SOURCE_DIR}/src/chad_lvr2.cpp")
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/")
 
-# LVR2
-find_package(TBB REQUIRED)
-find_package(VTK REQUIRED)
-find_package(GDAL REQUIRED)
-find_package(CGAL REQUIRED COMPONENTS Qt5)
-include(FetchContent)
-FetchContent_Declare(lvr2
-    GIT_REPOSITORY "https://gitlab.informatik.uni-osnabrueck.de/Las_Vegas_Reconstruction/Develop.git"
-    GIT_TAG "develop"
-    GIT_SHALLOW ON)
-FetchContent_MakeAvailable(lvr2)
-target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/include/")
-target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/HighFive/include/")
-target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/spdmon/include")
-target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/spdlog/include")
-find_package(HDF5 REQUIRED COMPONENTS C CXX HL)
-target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${HDF5_CXX_INCLUDE_DIRS}")
-target_link_libraries(${PROJECT_NAME} lvr2_static ${LVR2_LIB_DEPENDENCIES})
-target_link_libraries(${PROJECT_NAME} GDAL::GDAL)
-target_link_libraries(${PROJECT_NAME} CGAL::CGAL CGAL::CGAL_Qt5)
-
 # VDBFusion
 if (OFF)
-    # OpenVDB
+    set(OPENVDB_BUILD_PYTHON_MODULE OFF) # untested
+    set(OPENVDB_BUILD_VDB_PRINT OFF) # untested
+    set(OPENVDB_BUILD_AX OFF)
+    set(OPENVDB_BUILD_NANOVDB OFF)
+    set(OPENVDB_CORE_SHARED ON)
+    set(OPENVDB_CORE_STATIC OFF)
     FetchContent_Declare(openvdb
-        GIT_REPOSITORY "https://github.com/nachovizzo/openvdb.git"
-        GIT_TAG "v7.2.3"
-        GIT_SHALLOW ON)
+        GIT_REPOSITORY "https://github.com/AcademySoftwareFoundation/openvdb.git"
+        GIT_TAG "v11.0.0"
+        GIT_SHALLOW ON
+        OVERRIDE_FIND_PACKAGE)
     FetchContent_MakeAvailable(openvdb)
-    target_link_libraries(openvdb_static PUBLIC TBB::tbb)
-    target_link_libraries(openvdb_shared PUBLIC TBB::tbb)
-    target_link_libraries(${PROJECT_NAME} openvdb)
-    
+    target_link_libraries(${PROJECT_NAME} openvdb_shared)
+
     # VDBFusion
-    # set(VDBFUSION_STANDALONE ON)
-    # set(LIBIGL_USE_STATIC_LIBRARY ON)
     FetchContent_Declare(vdbfusion
         GIT_REPOSITORY "https://github.com/PRBonn/vdbfusion.git"
         GIT_TAG "v0.1.6"
         GIT_SHALLOW ON)
     FetchContent_Populate(vdbfusion)
-    FetchContent_Declare(libigl
-        GIT_REPOSITORY "https://github.com/libigl/libigl.git"
-        GIT_TAG "v2.5.0"
-        GIT_SHALLOW ON)
-    FetchContent_Populate(libigl)
     target_sources(${PROJECT_NAME} PRIVATE 
         "${vdbfusion_SOURCE_DIR}/src/vdbfusion/vdbfusion/VDBVolume.cpp"
         "${vdbfusion_SOURCE_DIR}/src/vdbfusion/vdbfusion/MarchingCubes.cpp")
     target_include_directories(${PROJECT_NAME} PRIVATE "${vdbfusion_SOURCE_DIR}/src/vdbfusion/")
-    # target_compile_definitions(${PROJECT_NAME} PRIVATE CHAD_VDB)
-    # target_link_libraries(${PROJECT_NAME} VDBFusion::vdbfusion)
-    target_link_libraries(${PROJECT_NAME} TBB::tbb)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE CHAD_VDB)
 endif()
+
+# LVR2
+FetchContent_Declare(lvr2
+    GIT_REPOSITORY "https://gitlab.informatik.uni-osnabrueck.de/Las_Vegas_Reconstruction/Develop.git"
+    GIT_TAG "develop"
+    GIT_SHALLOW ON)
+FetchContent_MakeAvailable(lvr2)
+find_package(HDF5 REQUIRED COMPONENTS C CXX HL)
+target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/include/")
+target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/HighFive/include/")
+target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/spdmon/include")
+target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/spdlog/include")
+target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${HDF5_CXX_INCLUDE_DIRS}")
+target_link_libraries(${PROJECT_NAME} lvr2_static ${LVR2_LIB_DEPENDENCIES})
 
 # CHAD TSDF
 add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/chad_tsdf")
