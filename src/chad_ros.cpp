@@ -8,16 +8,22 @@ struct ChadRos: public rclcpp::Node {
         _sub_deskewed = this->create_subscription<sensor_msgs::msg::PointCloud2>(pointcloud_topic, queue_size, std::bind(&ChadRos::callback_points, this, std::placeholders::_1));
         _sub_pose = this->create_subscription<geometry_msgs::msg::PoseStamped>(pose_topic, queue_size, std::bind(&ChadRos::callback_pose, this, std::placeholders::_1));
 
-        #ifdef CHAD_VDB
+        float voxel_resolution = VOXEL_RESOLUTION;
+        float sdf_truncation = VOXEL_RESOLUTION * 2;
+        bool space_carving = false;
+        #if MAPPING_BACKEND == 1
             openvdb::initialize();
-            float voxel_resolution = LEAF_RESOLUTION;
-            float sdf_truncation = LEAF_RESOLUTION * 2;
-            bool space_carving = false;
             vdb_volume_p = new vdbfusion::VDBVolume{ voxel_resolution, sdf_truncation, space_carving };
+        #elif MAPPING_BACKEND == 2
+            nvblox_mapper_p = new nvblox::Mapper(voxel_resolution, nvblox::MemoryType::kDevice);
         #endif
     }
     ~ChadRos() {
-        #ifdef CHAD_VDB
+        #if MAPPING_BACKEND == 0
+            chad.merge_all_subtrees();
+            chad.print_stats();
+            reconstruct(chad, 1, "mesh.ply", true);
+        #elif MAPPING_BACKEND == 1
             // generate mesh as per example in repo
             auto [vertices, triangles] = vdb_volume_p->ExtractTriangleMesh(true);
             Eigen::MatrixXd V(vertices.size(), 3);
@@ -30,10 +36,8 @@ struct ChadRos: public rclcpp::Node {
             }
             std::string filename = "maps/mesh.ply";
             igl::write_triangle_mesh(filename, V, F, igl::FileEncoding::Binary);
-        #else
-            chad.merge_all_subtrees();
-            chad.print_stats();
-            reconstruct(chad, 1, "mesh.ply", true);
+        #elif MAPPING_BACKEND == 2
+            nvblox_mapper_p->saveMeshAsPly("maps/nvblox");
         #endif
     }
 
@@ -49,43 +53,49 @@ struct ChadRos: public rclcpp::Node {
             pointsd.push_back({(double)point.x, (double)point.y, (double)point.z});
         }
 
+        #ifdef BENCHMARKING
+            auto beg = std::chrono::high_resolution_clock::now();
+        #endif
+
         // insert points into TSDF data structure
-        auto beg = std::chrono::high_resolution_clock::now();
-        #ifdef CHAD_VDB
-            Eigen::Vector3d pos = _cur_pos.cast<double>();
-            vdb_volume_p->Integrate(pointsd, pos, [](float weighting_input) { return weighting_input; });
-        #else
-            // insert points into TSDF CHAD
+        #if MAPPING_BACKEND == 0 // CHAD TSDF
             std::cout << "Inserting " << points.size() << " points into CHAD" << std::endl;
             chad.insert(points, _cur_pos, _cur_rot);
-        #endif
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::milliseconds dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - beg);
-        total += dur;
-        min = std::min(min, dur);
-        max = std::max(max, dur);
-
-        // manually reset pointcloud buffers before reading memory
-        points = {};
-        pointsd = {};
-        pointcloud = {};
-
-        // measure physical memory footprint
-        #ifdef CHAD_VDB
-            double mb = (double)read_phys_mem_kb() / 1024.0;
-        #else
-            double mb = (double)read_phys_mem_kb() / 1024.0;
-            double mb_read = chad.get_readonly_size();
-            double mb_hash = chad.get_hash_size();
+        #elif MAPPING_BACKEND == 1 // VDBFusion
+            Eigen::Vector3d pos = _cur_pos.cast<double>();
+            vdb_volume_p->Integrate(pointsd, pos, [](float weighting_input) { return weighting_input; });
+        #elif MAPPING_BACKEND == 2 // NVBlox
         #endif
 
-        // write measurements to csv
-        std::ofstream file { "measurements.csv", std::ofstream::app };
-        file << frame_count++ << ',' 
-            << mb << ',' 
-            << dur.count()
-            << '\n';
-        file.close();
+        #ifdef BENCHMARKING
+            auto end = std::chrono::high_resolution_clock::now();
+            std::chrono::milliseconds dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - beg);
+            total += dur;
+            min = std::min(min, dur);
+            max = std::max(max, dur);
+
+            // manually reset pointcloud buffers before reading memory
+            points = {};
+            pointsd = {};
+            pointcloud = {};
+
+            // measure physical memory footprint
+            #if MAPPING_BACKEND == 0
+                double mb = (double)read_phys_mem_kb() / 1024.0;
+                double mb_read = chad.get_readonly_size();
+                double mb_hash = chad.get_hash_size();
+            #elif MAPPING_BACKEND > 0
+                double mb = (double)read_phys_mem_kb() / 1024.0;
+            #endif
+
+            // write measurements to csv
+            std::ofstream file { "measurements.csv", std::ofstream::app };
+            file << frame_count++ << ',' 
+                << mb << ',' 
+                << dur.count()
+                << '\n';
+            file.close();
+        #endif
     }
     void callback_pose(const geometry_msgs::msg::PoseStamped& msg) {
         // extract position
@@ -110,10 +120,12 @@ struct ChadRos: public rclcpp::Node {
     Eigen::Vector3f _cur_pos = { 0, 0, 0 };
     Eigen::Quaternionf _cur_rot = { 1, 0, 0, 0 };
 
-    #ifdef CHAD_VDB
+    #if MAPPING_BACKEND == 0
+        Chad chad;
+    #elif MAPPING_BACKEND == 1
         vdbfusion::VDBVolume* vdb_volume_p;
-    #else
-        CHAD chad;
+    #elif MAPPING_BACKEND == 2
+        nvblox::Mapper* nvblox_mapper_p;
     #endif
 
     // benchmarking vars
@@ -121,7 +133,6 @@ struct ChadRos: public rclcpp::Node {
     std::chrono::milliseconds max = std::chrono::milliseconds::min();
     std::chrono::milliseconds total = std::chrono::milliseconds::zero();
     size_t frame_count = 0;
-
 };
 
 int main(int argc, char * argv[]) {

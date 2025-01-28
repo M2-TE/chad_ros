@@ -1,11 +1,13 @@
 cmake_minimum_required(VERSION 3.17)
-project(chad_ros LANGUAGES CXX C)
+project(chad_ros LANGUAGES C CXX CUDA)
 
 list(APPEND CMAKE_C_FLAGS "-march=native")
 list(APPEND CMAKE_CXX_FLAGS "-march=native")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 include(FetchContent)
@@ -16,8 +18,12 @@ add_executable(${PROJECT_NAME}
     "${CMAKE_CURRENT_SOURCE_DIR}/src/chad_lvr2.cpp")
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/")
 
-# VDBFusion
-if (ON)
+# set build options for all TSDF maps
+set(VOXEL_RESOLUTION 0.05)
+set(BENCHMARKING ON)
+
+
+if    (ON) # VDBFusion
     # OpenVDB
     set(OPENVDB_BUILD_PYTHON_MODULE OFF) # untested
     set(OPENVDB_BUILD_VDB_PRINT OFF) # untested
@@ -43,7 +49,6 @@ if (ON)
         "${vdbfusion_SOURCE_DIR}/src/vdbfusion/vdbfusion/VDBVolume.cpp"
         "${vdbfusion_SOURCE_DIR}/src/vdbfusion/vdbfusion/MarchingCubes.cpp")
     target_include_directories(${PROJECT_NAME} PRIVATE "${vdbfusion_SOURCE_DIR}/src/vdbfusion/")
-    target_compile_definitions(${PROJECT_NAME} PRIVATE CHAD_VDB)
 
     # IGL for reconstruction
     FetchContent_Declare(igl
@@ -52,28 +57,47 @@ if (ON)
         GIT_SHALLOW ON)
     FetchContent_MakeAvailable(igl)
     target_link_libraries(${PROJECT_NAME} igl::core)
+    set(MAPPING_BACKEND 1)
+elseif(OFF) # nvblox
+    set(BUILD_TESTING OFF)
+    FetchContent_Declare(nvblox
+        GIT_REPOSITORY "https://github.com/nvidia-isaac/nvblox.git"
+        GIT_TAG "ff4409b34f5d8434734a0028a936c9d294f372d8"
+        GIT_SHALLOW OFF)
+    FetchContent_Populate(nvblox)
+    add_subdirectory("${nvblox_SOURCE_DIR}" "${nvblox_BINARY_DIR}")
+    target_link_libraries(${PROJECT_NAME} nvblox_lib nvblox_gpu_hash)
+    set(MAPPING_BACKEND 2)
+else() # CHAD TSDF
+    # LVR2
+    FetchContent_Declare(lvr2
+        GIT_REPOSITORY "https://gitlab.informatik.uni-osnabrueck.de/Las_Vegas_Reconstruction/Develop.git"
+        GIT_TAG "develop"
+        GIT_SHALLOW ON)
+    FetchContent_MakeAvailable(lvr2)
+    find_package(HDF5 REQUIRED COMPONENTS C CXX HL)
+    target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/include/")
+    target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/HighFive/include/")
+    target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/spdmon/include")
+    target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/spdlog/include")
+    target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${HDF5_CXX_INCLUDE_DIRS}")
+    target_link_libraries(${PROJECT_NAME} lvr2_static ${LVR2_LIB_DEPENDENCIES})
+
+    # CHAD TSDF
+    set(CHAD_LEAF_RESOLUTION ${VOXEL_RESOLUTION})
+    add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/chad_tsdf")
+    find_package(Eigen3 REQUIRED NO_MODULE)
+    target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
+    target_link_libraries(${PROJECT_NAME} chad::tsdf)
+    target_link_libraries(${PROJECT_NAME} fmt::fmt)
+    target_link_libraries(${PROJECT_NAME} chad::tsdf)
+    set(MAPPING_BACKEND 0)
 endif()
 
-# LVR2
-FetchContent_Declare(lvr2
-    GIT_REPOSITORY "https://gitlab.informatik.uni-osnabrueck.de/Las_Vegas_Reconstruction/Develop.git"
-    GIT_TAG "develop"
-    GIT_SHALLOW ON)
-FetchContent_MakeAvailable(lvr2)
-find_package(HDF5 REQUIRED COMPONENTS C CXX HL)
-target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/include/")
-target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/HighFive/include/")
-target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/spdmon/include")
-target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/spdlog/include")
-target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${HDF5_CXX_INCLUDE_DIRS}")
-target_link_libraries(${PROJECT_NAME} lvr2_static ${LVR2_LIB_DEPENDENCIES})
-
-# CHAD TSDF
-add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/chad_tsdf")
-find_package(Eigen3 REQUIRED NO_MODULE)
-target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
-target_link_libraries(${PROJECT_NAME} chad::tsdf)
-target_link_libraries(${PROJECT_NAME} fmt::fmt)
+# set params as macro defs
+target_compile_definitions(${PROJECT_NAME} PUBLIC VOXEL_RESOLUTION=${VOXEL_RESOLUTION})
+target_compile_definitions(${PROJECT_NAME} PUBLIC BENCHMARKING=${BENCHMARKING})
+target_compile_definitions(${PROJECT_NAME} PUBLIC MAPPING_BACKEND=${MAPPING_BACKEND})
 
 # package dependencies
 find_package(ament_cmake REQUIRED)

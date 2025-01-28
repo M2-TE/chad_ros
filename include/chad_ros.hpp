@@ -13,13 +13,15 @@
 // ext
 #include <Eigen/Eigen>
 
-
-#ifdef CHAD_VDB
-    #include <vdbfusion/VDBVolume.h>
-    #include <igl/write_triangle_mesh.h>
-#else
+// mapping backends
+#if MAPPING_BACKEND == 0
     #include "chad_lvr2.hpp"
     #include "chad/chad.hpp"
+#elif MAPPING_BACKEND == 1
+    #include <vdbfusion/VDBVolume.h>
+    #include <igl/write_triangle_mesh.h>
+#elif MAPPING_BACKEND == 2
+    #include <nvblox/nvblox.h>
 #endif
 
 struct Point {

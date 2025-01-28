@@ -1,3 +1,5 @@
+#if MAPPING_BACKEND == 0
+
 #include "chad_grid.hpp"
 #include "chad_reconstruction.hpp"
 #include "chad_lvr2.hpp"
@@ -50,3 +52,4 @@ void reconstruct(Chad& chad, uint32_t root_addr, std::string_view mesh_name, boo
     lvr2::ModelFactory::saveModel(model_p, mesh_name.data());
     std::cout << "Saved mesh to " << mesh_name << std::endl;
 }
+#endif
