@@ -17,7 +17,8 @@ add_executable(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/")
 
 # VDBFusion
-if (OFF)
+if (ON)
+    # OpenVDB
     set(OPENVDB_BUILD_PYTHON_MODULE OFF) # untested
     set(OPENVDB_BUILD_VDB_PRINT OFF) # untested
     set(OPENVDB_BUILD_AX OFF)
@@ -43,6 +44,14 @@ if (OFF)
         "${vdbfusion_SOURCE_DIR}/src/vdbfusion/vdbfusion/MarchingCubes.cpp")
     target_include_directories(${PROJECT_NAME} PRIVATE "${vdbfusion_SOURCE_DIR}/src/vdbfusion/")
     target_compile_definitions(${PROJECT_NAME} PRIVATE CHAD_VDB)
+
+    # IGL for reconstruction
+    FetchContent_Declare(igl
+        GIT_REPOSITORY "https://github.com/libigl/libigl.git"
+        GIT_TAG "v2.5.0"
+        GIT_SHALLOW ON)
+    FetchContent_MakeAvailable(igl)
+    target_link_libraries(${PROJECT_NAME} igl::core)
 endif()
 
 # LVR2

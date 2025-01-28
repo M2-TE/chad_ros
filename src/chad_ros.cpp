@@ -1,20 +1,40 @@
 #include "chad_ros.hpp"
-#include "chad_lvr2.hpp"
-#include "chad/chad.hpp"
 
 struct ChadRos: public rclcpp::Node {
     ChadRos(): Node("minimal_subscriber") {
-        _sub_deskewed = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-            "/dlio/odom_node/pointcloud/deskewed", queue_size, std::bind(&ChadRos::callback_points, this, std::placeholders::_1));
-        // _sub_keyframe = this->create_subscription<sensor_msgs::msg::PointCloud2>(
-        //     "/dlio/odom_node/pointcloud/keyframe", queue_size, std::bind(&ChadRos::callback_points, this, std::placeholders::_1));
-        _sub_pose = this->create_subscription<geometry_msgs::msg::PoseStamped>(
-            "/dlio/odom_node/pose", queue_size, std::bind(&ChadRos::callback_pose, this, std::placeholders::_1));
+        // std::string pointcloud_topic = "/dlio/odom_node/pointcloud/keyframe";
+        std::string pointcloud_topic = "/dlio/odom_node/pointcloud/deskewed";
+        std::string pose_topic = "/dlio/odom_node/pose";
+        _sub_deskewed = this->create_subscription<sensor_msgs::msg::PointCloud2>(pointcloud_topic, queue_size, std::bind(&ChadRos::callback_points, this, std::placeholders::_1));
+        _sub_pose = this->create_subscription<geometry_msgs::msg::PoseStamped>(pose_topic, queue_size, std::bind(&ChadRos::callback_pose, this, std::placeholders::_1));
+
+        #ifdef CHAD_VDB
+            openvdb::initialize();
+            float voxel_resolution = LEAF_RESOLUTION;
+            float sdf_truncation = LEAF_RESOLUTION * 2;
+            bool space_carving = false;
+            vdb_volume_p = new vdbfusion::VDBVolume{ voxel_resolution, sdf_truncation, space_carving };
+        #endif
     }
     ~ChadRos() {
-        chad.merge_all_subtrees();
-        chad.print_stats();
-        reconstruct(chad, 1, "mesh.ply", true);
+        #ifdef CHAD_VDB
+            // generate mesh as per example in repo
+            auto [vertices, triangles] = vdb_volume_p->ExtractTriangleMesh(true);
+            Eigen::MatrixXd V(vertices.size(), 3);
+            for (size_t i = 0; i < vertices.size(); i++) {
+                V.row(i) = Eigen::VectorXd::Map(&vertices[i][0], vertices[i].size());
+            }
+            Eigen::MatrixXi F(triangles.size(), 3);
+            for (size_t i = 0; i < triangles.size(); i++) {
+                F.row(i) = Eigen::VectorXi::Map(&triangles[i][0], triangles[i].size());
+            }
+            std::string filename = "maps/mesh.ply";
+            igl::write_triangle_mesh(filename, V, F, igl::FileEncoding::Binary);
+        #else
+            chad.merge_all_subtrees();
+            chad.print_stats();
+            reconstruct(chad, 1, "mesh.ply", true);
+        #endif
     }
 
     void callback_points(const sensor_msgs::msg::PointCloud2& msg) {
@@ -22,14 +42,50 @@ struct ChadRos: public rclcpp::Node {
         pcl::PointCloud<Point> pointcloud = {};
         pcl::fromROSMsg(msg, pointcloud);
         std::vector<std::array<float, 3>> points;
+        std::vector<Eigen::Vector3d> pointsd;
         points.reserve(pointcloud.points.size());
         for (const auto& point: pointcloud.points) {
             points.push_back({point.x, point.y, point.z});
+            pointsd.push_back({(double)point.x, (double)point.y, (double)point.z});
         }
 
-        // insert points into TSDF CHAD
-        std::cout << "Inserting " << points.size() << " points into CHAD" << std::endl;
-        chad.insert(points, _cur_pos, _cur_rot);
+        // insert points into TSDF data structure
+        auto beg = std::chrono::high_resolution_clock::now();
+        #ifdef CHAD_VDB
+            Eigen::Vector3d pos = _cur_pos.cast<double>();
+            vdb_volume_p->Integrate(pointsd, pos, [](float weighting_input) { return weighting_input; });
+        #else
+            // insert points into TSDF CHAD
+            std::cout << "Inserting " << points.size() << " points into CHAD" << std::endl;
+            chad.insert(points, _cur_pos, _cur_rot);
+        #endif
+        auto end = std::chrono::high_resolution_clock::now();
+        std::chrono::milliseconds dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - beg);
+        total += dur;
+        min = std::min(min, dur);
+        max = std::max(max, dur);
+
+        // manually reset pointcloud buffers before reading memory
+        points = {};
+        pointsd = {};
+        pointcloud = {};
+
+        // measure physical memory footprint
+        #ifdef CHAD_VDB
+            double mb = (double)read_phys_mem_kb() / 1024.0;
+        #else
+            double mb = (double)read_phys_mem_kb() / 1024.0;
+            double mb_read = chad.get_readonly_size();
+            double mb_hash = chad.get_hash_size();
+        #endif
+
+        // write measurements to csv
+        std::ofstream file { "measurements.csv", std::ofstream::app };
+        file << frame_count++ << ',' 
+            << mb << ',' 
+            << dur.count()
+            << '\n';
+        file.close();
     }
     void callback_pose(const geometry_msgs::msg::PoseStamped& msg) {
         // extract position
@@ -53,7 +109,19 @@ struct ChadRos: public rclcpp::Node {
     rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr _sub_pose;
     Eigen::Vector3f _cur_pos = { 0, 0, 0 };
     Eigen::Quaternionf _cur_rot = { 1, 0, 0, 0 };
-    Chad chad;
+
+    #ifdef CHAD_VDB
+        vdbfusion::VDBVolume* vdb_volume_p;
+    #else
+        CHAD chad;
+    #endif
+
+    // benchmarking vars
+    std::chrono::milliseconds min = std::chrono::milliseconds::max();
+    std::chrono::milliseconds max = std::chrono::milliseconds::min();
+    std::chrono::milliseconds total = std::chrono::milliseconds::zero();
+    size_t frame_count = 0;
+
 };
 
 int main(int argc, char * argv[]) {

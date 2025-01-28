@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdio>
+#include <linux/sysinfo.h>
 // ROS2
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/string.hpp>
@@ -12,8 +13,13 @@
 // ext
 #include <Eigen/Eigen>
 
+
 #ifdef CHAD_VDB
-#include <vdbfusion/VDBVolume.h>
+    #include <vdbfusion/VDBVolume.h>
+    #include <igl/write_triangle_mesh.h>
+#else
+    #include "chad_lvr2.hpp"
+    #include "chad/chad.hpp"
 #endif
 
 struct Point {
@@ -37,3 +43,26 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(Point,
     (std::uint32_t, t, t)
     (float, time, time)
     (double, timestamp, timestamp))
+
+int parseLine(char* line) {
+    // This assumes that a digit will be found and the line ends in " Kb".
+    int i = strlen(line);
+    const char* p = line;
+    while (*p <'0' || *p > '9') p++;
+    line[i-3] = '\0';
+    i = atoi(p);
+    return i;
+}
+int read_phys_mem_kb() {
+    FILE* file = fopen("/proc/self/status", "r");
+    int result = -1;
+    char line[128];
+    while (fgets(line, 128, file) != NULL){
+        if (strncmp(line, "VmRSS:", 6) == 0){
+            result = parseLine(line);
+            break;
+        }
+    }
+    fclose(file);
+    return result;
+}
