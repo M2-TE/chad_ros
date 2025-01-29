@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.17)
-project(chad_ros LANGUAGES C CXX CUDA)
+project(chad_ros LANGUAGES C CXX)
 
 list(APPEND CMAKE_C_FLAGS "-march=native")
 list(APPEND CMAKE_CXX_FLAGS "-march=native")
@@ -22,8 +22,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/
 set(VOXEL_RESOLUTION 0.05)
 set(BENCHMARKING ON)
 
-
-if    (ON) # VDBFusion
+if    (OFF) # VDBFusion
     # OpenVDB
     set(OPENVDB_BUILD_PYTHON_MODULE OFF) # untested
     set(OPENVDB_BUILD_VDB_PRINT OFF) # untested
@@ -69,6 +68,7 @@ elseif(OFF) # nvblox
     target_link_libraries(${PROJECT_NAME} nvblox_lib nvblox_gpu_hash)
     set(MAPPING_BACKEND 2)
 else() # CHAD TSDF
+    set(CUDA_COMPILER /usr/disabled)
     # LVR2
     FetchContent_Declare(lvr2
         GIT_REPOSITORY "https://gitlab.informatik.uni-osnabrueck.de/Las_Vegas_Reconstruction/Develop.git"
