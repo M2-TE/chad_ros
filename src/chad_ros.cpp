@@ -3,8 +3,10 @@
 struct ChadRos: public rclcpp::Node {
     ChadRos(): Node("minimal_subscriber") {
         // std::string pointcloud_topic = "/dlio/odom_node/pointcloud/keyframe";
-        std::string pointcloud_topic = "/dlio/odom_node/pointcloud/deskewed";
-        std::string pose_topic = "/dlio/odom_node/pose";
+        // std::string pointcloud_topic = "/dlio/odom_node/pointcloud/deskewed";
+        // std::string pose_topic = "/dlio/odom_node/pose";
+        std::string pointcloud_topic = "/robot/dlio/odom_node/pointcloud/deskewed";
+        std::string pose_topic = "/robot/dlio/odom_node/pose";
         _sub_deskewed = this->create_subscription<sensor_msgs::msg::PointCloud2>(pointcloud_topic, queue_size, std::bind(&ChadRos::callback_points, this, std::placeholders::_1));
         _sub_pose = this->create_subscription<geometry_msgs::msg::PoseStamped>(pose_topic, queue_size, std::bind(&ChadRos::callback_pose, this, std::placeholders::_1));
 
@@ -30,7 +32,7 @@ struct ChadRos: public rclcpp::Node {
             measurements.close();
         #endif
 
-        return; // DISABLING MAP CONSTUCTION
+        // return; // DISABLING MAP CONSTUCTION
 
         #if MAPPING_BACKEND == 0
             chad.merge_all_subtrees();
@@ -58,7 +60,7 @@ struct ChadRos: public rclcpp::Node {
         // extract pointcloud from message
         pcl::PointCloud<Point> pointcloud = {};
         pcl::fromROSMsg(msg, pointcloud);
-        std::vector<std::array<float, 3>> points;
+        std::vector<Eigen::Vector3f> points;
         std::vector<Eigen::Vector3d> pointsd;
         #if MAPPING_BACKEND == 1
             pointsd.reserve(pointcloud.points.size());
