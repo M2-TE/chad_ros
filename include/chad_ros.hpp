@@ -21,7 +21,7 @@
     #include <vdbfusion/VDBVolume.h>
     #include <igl/write_triangle_mesh.h>
 #elif MAPPING_BACKEND == 2
-    #include <nvblox/nvblox.h>
+    #include <octomap/octomap.h>
 #endif
 
 struct Point {

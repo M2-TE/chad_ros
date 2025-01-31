@@ -18,7 +18,7 @@ struct ChadRos: public rclcpp::Node {
             openvdb::initialize();
             vdb_volume_p = new vdbfusion::VDBVolume{ voxel_resolution, sdf_truncation, space_carving };
         #elif MAPPING_BACKEND == 2
-            nvblox_mapper_p = new nvblox::Mapper(voxel_resolution, nvblox::MemoryType::kDevice);
+            octomap_tree_p = new octomap::OcTree{ voxel_resolution };
         #endif
 
         // create a new measurement file
@@ -32,7 +32,7 @@ struct ChadRos: public rclcpp::Node {
             measurements.close();
         #endif
 
-        // return; // DISABLING MAP CONSTUCTION
+        return; // DISABLING MAP CONSTUCTION
 
         #if MAPPING_BACKEND == 0
             chad.merge_all_subtrees();
@@ -52,7 +52,7 @@ struct ChadRos: public rclcpp::Node {
             std::string filename = "mesh.ply";
             igl::write_triangle_mesh(filename, V, F, igl::FileEncoding::Binary);
         #elif MAPPING_BACKEND == 2
-            nvblox_mapper_p->saveMeshAsPly("maps/nvblox");
+            // octomap_tree_p->writeBinary("maps/octomap.bt");
         #endif
     }
 
@@ -85,12 +85,18 @@ struct ChadRos: public rclcpp::Node {
         #elif MAPPING_BACKEND == 1 // VDBFusion
             Eigen::Vector3d pos = _cur_pos.cast<double>();
             vdb_volume_p->Integrate(pointsd, pos, [](float weighting_input) { return 1.0f; });
-        #elif MAPPING_BACKEND == 2 // NVBlox
+        #elif MAPPING_BACKEND == 2 // octomap
+            octomap::Pointcloud cloud;
+            for (auto& point: points) {
+                cloud.push_back({ point.x(), point.y(), point.z() });
+            }
+            octomap_tree_p->insertPointCloud(cloud, { _cur_pos.x(), _cur_pos.y(), _cur_pos.z() });
         #endif
 
         #ifdef BENCHMARKING
             auto end = std::chrono::high_resolution_clock::now();
             std::chrono::milliseconds dur = std::chrono::duration_cast<std::chrono::milliseconds>(end - beg);
+            std::cout << "TSDF update took " << dur.count() << "ms" << std::endl;
 
             // manually reset pointcloud buffers before reading memory
             points = {};
@@ -140,7 +146,7 @@ struct ChadRos: public rclcpp::Node {
     #elif MAPPING_BACKEND == 1
         vdbfusion::VDBVolume* vdb_volume_p;
     #elif MAPPING_BACKEND == 2
-        nvblox::Mapper* nvblox_mapper_p;
+        octomap::OcTree* octomap_tree_p;
     #endif
 
     // benchmarking vars

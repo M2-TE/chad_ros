@@ -57,15 +57,9 @@ if    (OFF) # VDBFusion
     FetchContent_MakeAvailable(igl)
     target_link_libraries(${PROJECT_NAME} igl::core)
     set(MAPPING_BACKEND 1)
-elseif(OFF) # nvblox
-    set(BUILD_TESTING OFF)
-    FetchContent_Declare(nvblox
-        GIT_REPOSITORY "https://github.com/nvidia-isaac/nvblox.git"
-        GIT_TAG "ff4409b34f5d8434734a0028a936c9d294f372d8"
-        GIT_SHALLOW OFF)
-    FetchContent_Populate(nvblox)
-    add_subdirectory("${nvblox_SOURCE_DIR}" "${nvblox_BINARY_DIR}")
-    target_link_libraries(${PROJECT_NAME} nvblox_lib nvblox_gpu_hash)
+elseif(OFF) # octomap
+    find_package(octomap REQUIRED)
+    target_link_libraries(${PROJECT_NAME} octomap octomath)
     set(MAPPING_BACKEND 2)
 else() # CHAD TSDF
     set(CUDA_COMPILER /usr/disabled)
