@@ -21,6 +21,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/
 # set build options for all TSDF maps
 set(VOXEL_RESOLUTION 0.05)
 set(BENCHMARKING ON)
+set(RECONSTRUCTION OFF)
 
 if    (OFF) # VDBFusion
     # OpenVDB
@@ -90,8 +91,13 @@ endif()
 
 # set params as macro defs
 target_compile_definitions(${PROJECT_NAME} PUBLIC VOXEL_RESOLUTION=${VOXEL_RESOLUTION})
-target_compile_definitions(${PROJECT_NAME} PUBLIC BENCHMARKING=${BENCHMARKING})
 target_compile_definitions(${PROJECT_NAME} PUBLIC MAPPING_BACKEND=${MAPPING_BACKEND})
+if(BENCHMARKING)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC BENCHMARKING)
+endif()
+if(RECONSTRUCTION)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC RECONSTRUCTION)
+endif()
 
 # package dependencies
 find_package(ament_cmake REQUIRED)

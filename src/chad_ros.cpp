@@ -32,27 +32,30 @@ struct ChadRos: public rclcpp::Node {
             measurements.close();
         #endif
 
-        return; // DISABLING MAP CONSTUCTION
-
         #if MAPPING_BACKEND == 0
+            chad.print_stats();
             chad.merge_all_subtrees();
             chad.print_stats();
-            reconstruct(chad, 1, "mesh.ply", true);
+            #ifdef RECONSTRUCTION
+                reconstruct(chad, 1, "mesh.ply", true);
+            #endif
         #elif MAPPING_BACKEND == 1
-            // generate mesh as per example in repo
-            auto [vertices, triangles] = vdb_volume_p->ExtractTriangleMesh(true);
-            Eigen::MatrixXd V(vertices.size(), 3);
-            for (size_t i = 0; i < vertices.size(); i++) {
-                V.row(i) = Eigen::VectorXd::Map(&vertices[i][0], vertices[i].size());
-            }
-            Eigen::MatrixXi F(triangles.size(), 3);
-            for (size_t i = 0; i < triangles.size(); i++) {
-                F.row(i) = Eigen::VectorXi::Map(&triangles[i][0], triangles[i].size());
-            }
-            std::string filename = "mesh.ply";
-            igl::write_triangle_mesh(filename, V, F, igl::FileEncoding::Binary);
+            #ifdef RECONSTRUCTION
+                // generate mesh as per example in repo
+                auto [vertices, triangles] = vdb_volume_p->ExtractTriangleMesh(true);
+                Eigen::MatrixXd V(vertices.size(), 3);
+                for (size_t i = 0; i < vertices.size(); i++) {
+                    V.row(i) = Eigen::VectorXd::Map(&vertices[i][0], vertices[i].size());
+                }
+                Eigen::MatrixXi F(triangles.size(), 3);
+                for (size_t i = 0; i < triangles.size(); i++) {
+                    F.row(i) = Eigen::VectorXi::Map(&triangles[i][0], triangles[i].size());
+                }
+                std::string filename = "mesh.ply";
+                igl::write_triangle_mesh(filename, V, F, igl::FileEncoding::Binary);
+            #endif
         #elif MAPPING_BACKEND == 2
-            // octomap_tree_p->writeBinary("maps/octomap.bt");
+            // octomap_tree_p->writeBinary("mesh.ply");
         #endif
     }
 
@@ -66,6 +69,12 @@ struct ChadRos: public rclcpp::Node {
             pointsd.reserve(pointcloud.points.size());
             for (const auto& point: pointcloud.points) {
                 pointsd.push_back({(double)point.x, (double)point.y, (double)point.z});
+            }
+        #elif MAPPING_BACKEND == 2
+            octomap::Pointcloud cloud;
+            cloud.reserve(pointcloud.points.size());
+            for (const auto& point: pointcloud.points) {
+                cloud.push_back({ point.x, point.y, point.z });
             }
         #else
             points.reserve(pointcloud.points.size());
@@ -86,11 +95,8 @@ struct ChadRos: public rclcpp::Node {
             Eigen::Vector3d pos = _cur_pos.cast<double>();
             vdb_volume_p->Integrate(pointsd, pos, [](float weighting_input) { return 1.0f; });
         #elif MAPPING_BACKEND == 2 // octomap
-            octomap::Pointcloud cloud;
-            for (auto& point: points) {
-                cloud.push_back({ point.x(), point.y(), point.z() });
-            }
-            octomap_tree_p->insertPointCloud(cloud, { _cur_pos.x(), _cur_pos.y(), _cur_pos.z() });
+            octomap_tree_p->insertPointCloud(cloud, { _cur_pos.x(), _cur_pos.y(), _cur_pos.z() }, -1.0, true, true);
+            octomap_tree_p->updateInnerOccupancy();
         #endif
 
         #ifdef BENCHMARKING
@@ -102,6 +108,10 @@ struct ChadRos: public rclcpp::Node {
             points = {};
             pointsd = {};
             pointcloud = {};
+
+            #if MAPPING_BACKEND == 2 // octomap
+                cloud.clear();
+            #endif
 
             // measure physical memory footprint
             double mb = (double)read_phys_mem_kb() / 1024.0;
