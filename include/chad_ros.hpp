@@ -22,6 +22,8 @@
     #include <igl/write_triangle_mesh.h>
 #elif MAPPING_BACKEND == 2
     #include <octomap/octomap.h>
+#elif MAPPING_BACKEND == 3
+    #include <voxblox/core/tsdf_map.h>
 #endif
 
 struct Point {

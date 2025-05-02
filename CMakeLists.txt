@@ -11,6 +11,7 @@ set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 include(FetchContent)
+set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 
 # ros2 node executable
 add_executable(${PROJECT_NAME} 
@@ -60,8 +61,17 @@ if    (OFF) # VDBFusion
     set(MAPPING_BACKEND 1)
 elseif(OFF) # octomap
     find_package(octomap REQUIRED)
-    target_link_libraries(${PROJECT_NAME} octomap octomath)
+    target_link_libraries(${PROJECT_NAME} ${OCTOMAP_LIBRARIES})
+    target_include_directories(${PROJECT_NAME} PRIVATE ${OCTOMAP_INCLUDE_DIRS})
     set(MAPPING_BACKEND 2)
+elseif(OFF) # Voxblox
+    FetchContent_Declare(voxblox
+        GIT_REPOSITORY "https://github.com/ethz-asl/voxblox.git"
+        GIT_TAG "master"
+        GIT_SHALLOW ON
+        OVERRIDE_FIND_PACKAGE)
+    FetchContent_MakeAvailable(voxblox)
+    set(MAPPING_BACKEND 3)
 else() # CHAD TSDF
     set(CUDA_COMPILER /usr/disabled)
     # LVR2

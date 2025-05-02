@@ -55,7 +55,7 @@ struct ChadRos: public rclcpp::Node {
                 igl::write_triangle_mesh(filename, V, F, igl::FileEncoding::Binary);
             #endif
         #elif MAPPING_BACKEND == 2
-            // octomap_tree_p->writeBinary("mesh.ply");
+            octomap_tree_p->write("mesh.ply");
         #endif
     }
 
@@ -96,7 +96,7 @@ struct ChadRos: public rclcpp::Node {
             vdb_volume_p->Integrate(pointsd, pos, [](float weighting_input) { return 1.0f; });
         #elif MAPPING_BACKEND == 2 // octomap
             octomap_tree_p->insertPointCloud(cloud, { _cur_pos.x(), _cur_pos.y(), _cur_pos.z() }, -1.0, true, true);
-            octomap_tree_p->updateInnerOccupancy();
+        #elif MAPPING_BACKEND == 3 // voxblox
         #endif
 
         #ifdef BENCHMARKING
