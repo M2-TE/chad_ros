@@ -14,7 +14,9 @@ struct ChadRos: public rclcpp::Node {
         float voxel_resolution = VOXEL_RESOLUTION;
         float sdf_truncation = VOXEL_RESOLUTION * 2;
         bool space_carving = false;
-        #if MAPPING_BACKEND == 1
+        #if MAPPING_BACKEND == 0
+            chad_map_p = new chad::TSDFMap( voxel_resolution, sdf_truncation );
+        #elif MAPPING_BACKEND == 1
             openvdb::initialize();
             vdb_volume_p = new vdbfusion::VDBVolume{ voxel_resolution, sdf_truncation, space_carving };
         #elif MAPPING_BACKEND == 2
@@ -32,15 +34,10 @@ struct ChadRos: public rclcpp::Node {
             measurements.close();
         #endif
 
-        #if MAPPING_BACKEND == 0
-            chad.print_stats();
-            chad.merge_all_subtrees();
-            chad.print_stats();
-            #ifdef RECONSTRUCTION
-                reconstruct(chad, 1, "mesh.ply", true);
-            #endif
-        #elif MAPPING_BACKEND == 1
-            #ifdef RECONSTRUCTION
+        #ifdef RECONSTRUCTION
+            #if MAPPING_BACKEND == 0
+                chad_map_p->save("mesh.ply");
+            #elif MAPPING_BACKEND == 1
                 // generate mesh as per example in repo
                 auto [vertices, triangles] = vdb_volume_p->ExtractTriangleMesh(true);
                 Eigen::MatrixXd V(vertices.size(), 3);
@@ -53,9 +50,9 @@ struct ChadRos: public rclcpp::Node {
                 }
                 std::string filename = "mesh.ply";
                 igl::write_triangle_mesh(filename, V, F, igl::FileEncoding::Binary);
+            #elif MAPPING_BACKEND == 2
+                octomap_tree_p->write("mesh.ply");
             #endif
-        #elif MAPPING_BACKEND == 2
-            octomap_tree_p->write("mesh.ply");
         #endif
     }
 
@@ -90,7 +87,7 @@ struct ChadRos: public rclcpp::Node {
         // insert points into TSDF data structure
         #if MAPPING_BACKEND == 0 // CHAD TSDF
             std::cout << "Inserting " << points.size() << " points into CHAD" << std::endl;
-            chad.insert(points, _cur_pos, _cur_rot);
+            chad_map_p->insert(points, _cur_pos);
         #elif MAPPING_BACKEND == 1 // VDBFusion
             Eigen::Vector3d pos = _cur_pos.cast<double>();
             vdb_volume_p->Integrate(pointsd, pos, [](float weighting_input) { return 1.0f; });
@@ -152,7 +149,7 @@ struct ChadRos: public rclcpp::Node {
     Eigen::Quaternionf _cur_rot = { 1, 0, 0, 0 };
 
     #if MAPPING_BACKEND == 0
-        Chad chad;
+        chad::TSDFMap* chad_map_p;
     #elif MAPPING_BACKEND == 1
         vdbfusion::VDBVolume* vdb_volume_p;
     #elif MAPPING_BACKEND == 2
@@ -168,5 +165,6 @@ int main(int argc, char * argv[]) {
     rclcpp::init(argc, argv);
     rclcpp::spin(std::make_shared<ChadRos>());
     rclcpp::shutdown();
+
     return 0;
 }
