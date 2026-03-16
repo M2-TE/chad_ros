@@ -15,8 +15,7 @@
 
 // mapping backends
 #if MAPPING_BACKEND == 0
-    #include "chad_lvr2.hpp"
-    #include "chad/chad.hpp"
+    #include "chad/tsdf_map.hpp"
 #elif MAPPING_BACKEND == 1
     #include <vdbfusion/VDBVolume.h>
     #include <igl/write_triangle_mesh.h>

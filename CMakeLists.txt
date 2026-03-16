@@ -14,15 +14,11 @@ include(FetchContent)
 set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
 
 # ros2 node executable
-add_executable(${PROJECT_NAME} 
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/chad_ros.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/chad_lvr2.cpp")
+add_executable(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/src/chad_ros.cpp")
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include/")
 
 # set build options for all TSDF maps
 set(VOXEL_RESOLUTION 0.05)
-set(BENCHMARKING ON)
-set(RECONSTRUCTION OFF)
 
 if    (OFF) # VDBFusion
     # OpenVDB
@@ -59,42 +55,17 @@ if    (OFF) # VDBFusion
     FetchContent_MakeAvailable(igl)
     target_link_libraries(${PROJECT_NAME} igl::core)
     set(MAPPING_BACKEND 1)
-elseif(OFF) # octomap
-    find_package(octomap REQUIRED)
-    target_link_libraries(${PROJECT_NAME} ${OCTOMAP_LIBRARIES})
-    target_include_directories(${PROJECT_NAME} PRIVATE ${OCTOMAP_INCLUDE_DIRS})
-    set(MAPPING_BACKEND 2)
-elseif(OFF) # Voxblox
-    FetchContent_Declare(voxblox
-        GIT_REPOSITORY "https://github.com/ethz-asl/voxblox.git"
-        GIT_TAG "master"
-        GIT_SHALLOW ON
-        OVERRIDE_FIND_PACKAGE)
-    FetchContent_MakeAvailable(voxblox)
-    set(MAPPING_BACKEND 3)
-else() # CHAD TSDF
-    set(CUDA_COMPILER /usr/disabled)
-    # LVR2
-    FetchContent_Declare(lvr2
-        GIT_REPOSITORY "https://gitlab.informatik.uni-osnabrueck.de/Las_Vegas_Reconstruction/Develop.git"
-        GIT_TAG "develop"
-        GIT_SHALLOW ON)
-    FetchContent_MakeAvailable(lvr2)
-    find_package(HDF5 REQUIRED COMPONENTS C CXX HL)
-    target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/include/")
-    target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/HighFive/include/")
-    target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/spdmon/include")
-    target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${lvr2_SOURCE_DIR}/ext/spdlog/include")
-    target_include_directories(${PROJECT_NAME} PRIVATE SYSTEM "${HDF5_CXX_INCLUDE_DIRS}")
-    target_link_libraries(${PROJECT_NAME} lvr2_static ${LVR2_LIB_DEPENDENCIES})
+elseif(OFF) # nvblox
+    # FetchContent_Declare(nvblox
+    #     GIT_REPOSITORY "https://github.com/nvidia-isaac/nvblox.git"
+    #     GIT_TAG "v0.0.9-hotfix1"
+    #     GIT_SHALLOW ON
+    #     OVERRIDE_FIND_PACKAGE)
+    # FetchContent_MakeAvailable(nvblox)
 
-    # CHAD TSDF
-    set(CHAD_LEAF_RESOLUTION ${VOXEL_RESOLUTION})
+    set(MAPPING_BACKEND 2)
+else() # CHAD TSDF
     add_subdirectory("${CMAKE_CURRENT_SOURCE_DIR}/chad_tsdf")
-    find_package(Eigen3 REQUIRED NO_MODULE)
-    target_link_libraries(${PROJECT_NAME} Eigen3::Eigen)
-    target_link_libraries(${PROJECT_NAME} chad::tsdf)
-    target_link_libraries(${PROJECT_NAME} fmt::fmt)
     target_link_libraries(${PROJECT_NAME} chad::tsdf)
     set(MAPPING_BACKEND 0)
 endif()
@@ -102,12 +73,6 @@ endif()
 # set params as macro defs
 target_compile_definitions(${PROJECT_NAME} PUBLIC VOXEL_RESOLUTION=${VOXEL_RESOLUTION})
 target_compile_definitions(${PROJECT_NAME} PUBLIC MAPPING_BACKEND=${MAPPING_BACKEND})
-if(BENCHMARKING)
-    target_compile_definitions(${PROJECT_NAME} PUBLIC BENCHMARKING)
-endif()
-if(RECONSTRUCTION)
-    target_compile_definitions(${PROJECT_NAME} PUBLIC RECONSTRUCTION)
-endif()
 
 # package dependencies
 find_package(ament_cmake REQUIRED)
